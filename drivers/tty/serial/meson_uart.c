@@ -471,6 +471,9 @@ static void meson_serial_console_write(struct console *co, const char *s,
 
 	uart_console_write(port, s, count, meson_console_putchar);
 
+	while (!meson_uart_tx_empty(port))
+		cpu_relax();
+
 	if (locked)
 		spin_unlock(&port->lock);
 	local_irq_restore(flags);
