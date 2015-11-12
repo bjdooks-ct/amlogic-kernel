@@ -436,8 +436,13 @@ static struct uart_ops meson_uart_ops = {
 
 static void meson_console_putchar(struct uart_port *port, int ch)
 {
+	u32 val;
+
 	if (!port->membase)
 		return;
+
+	val = readl(port->membase + AML_UART_CONTROL);
+	writel(val | AML_UART_TX_EN, port->membase + AML_UART_CONTROL);
 
 	while (readl(port->membase + AML_UART_STATUS) & AML_UART_TX_FULL)
 		cpu_relax();
