@@ -156,6 +156,13 @@
 			status = "disabled";
 		};
 
+		rtc: rtc@c8100740 {
+			compatible = "amlogic,meson8b-rtc";
+			reg = <0xc8100740 0x14>;
+			resets = <&reset RESET_RTC>;
+			status = "disabled";
+		};
+
 		clkc: clock-controller@c1104000 {
 			#clock-cells = <1>;
 			compatible = "amlogic,meson8b-clkc";
