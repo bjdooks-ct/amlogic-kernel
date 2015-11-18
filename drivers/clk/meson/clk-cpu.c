@@ -42,6 +42,9 @@
 
 #define MESON_CPU_CLK_CNTL1		0x00
 #define MESON_CPU_CLK_CNTL		0x40
+#define MESON_CPU_CLK_CNTL_CPU		0x19c
+
+#define MESON_MAX_CPU_RST		4
 
 #define MESON_CPU_CLK_MUX1		BIT(7)
 #define MESON_CPU_CLK_MUX2		BIT(0)
@@ -204,7 +207,8 @@ static int meson_reset_cpu_assert(struct reset_controller_dev *rcdev,
 	return 0;
 }
 
-static int meson_reset_cpu_deassert(struct reset_controller_dev *rcdev, unsigned long id)
+static int meson_reset_cpu_deassert(struct reset_controller_dev *rcdev,
+				    unsigned long id)
 {
 	u32 reg;
 	struct meson_reset_cpu *reset_cpu = container_of(rcdev,
@@ -275,13 +279,11 @@ struct clk *meson_clk_register_cpu(struct device_node *np,
 	}
 
 	reset_cpu = kzalloc(sizeof(*reset_cpu), GFP_KERNEL);
-	if (!reset_cpu) {
-		pr_err("%s: unable to allocate reset controller\n", __func__);
+	if (!reset_cpu)
 		goto out;
-	}
 
-	reset_cpu->reset_base = reg_base + MESON_CPU_CLK_CNTL;
-	reset_cpu->rcdev.nr_resets = 3;
+	reset_cpu->reset_base = reg_base + MESON_CPU_CLK_CNTL_CPU;
+	reset_cpu->rcdev.nr_resets = MESON_MAX_CPU_RST;
 	reset_cpu->rcdev.ops = &meson_cpu_reset_ops;
 	reset_cpu->rcdev.of_node = np;
 	reset_controller_register(&reset_cpu->rcdev);

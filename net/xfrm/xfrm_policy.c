@@ -1208,7 +1208,7 @@ static inline int policy_to_flow_dir(int dir)
 	}
 }
 
-static struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir,
+static struct xfrm_policy *xfrm_sk_policy_lookup(const struct sock *sk, int dir,
 						 const struct flowi *fl)
 {
 	struct xfrm_policy *pol;
@@ -1583,8 +1583,6 @@ static inline struct xfrm_dst *xfrm_alloc_dst(struct net *net, int family)
 
 		memset(dst + 1, 0, sizeof(*xdst) - sizeof(*dst));
 		xdst->flo.ops = &xfrm_bundle_fc_ops;
-		if (afinfo->init_dst)
-			afinfo->init_dst(net, xdst);
 	} else
 		xdst = ERR_PTR(-ENOBUFS);
 
@@ -1889,6 +1887,7 @@ static void xfrm_policy_queue_process(unsigned long arg)
 	struct sock *sk;
 	struct dst_entry *dst;
 	struct xfrm_policy *pol = (struct xfrm_policy *)arg;
+	struct net *net = xp_net(pol);
 	struct xfrm_policy_queue *pq = &pol->polq;
 	struct flowi fl;
 	struct sk_buff_head list;
@@ -1905,8 +1904,7 @@ static void xfrm_policy_queue_process(unsigned long arg)
 	spin_unlock(&pq->hold_queue.lock);
 
 	dst_hold(dst->path);
-	dst = xfrm_lookup(xp_net(pol), dst->path, &fl,
-			  sk, 0);
+	dst = xfrm_lookup(net, dst->path, &fl, sk, 0);
 	if (IS_ERR(dst))
 		goto purge_queue;
 
@@ -1936,8 +1934,7 @@ static void xfrm_policy_queue_process(unsigned long arg)
 
 		xfrm_decode_session(skb, &fl, skb_dst(skb)->ops->family);
 		dst_hold(skb_dst(skb)->path);
-		dst = xfrm_lookup(xp_net(pol), skb_dst(skb)->path,
-				  &fl, skb->sk, 0);
+		dst = xfrm_lookup(net, skb_dst(skb)->path, &fl, skb->sk, 0);
 		if (IS_ERR(dst)) {
 			kfree_skb(skb);
 			continue;
@@ -1947,7 +1944,7 @@ static void xfrm_policy_queue_process(unsigned long arg)
 		skb_dst_drop(skb);
 		skb_dst_set(skb, dst);
 
-		dst_output(skb);
+		dst_output(net, skb->sk, skb);
 	}
 
 out:
@@ -1960,7 +1957,7 @@ purge_queue:
 	xfrm_pol_put(pol);
 }
 
-static int xdst_queue_output(struct sock *sk, struct sk_buff *skb)
+static int xdst_queue_output(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	unsigned long sched_next;
 	struct dst_entry *dst = skb_dst(skb);
@@ -2187,7 +2184,7 @@ static struct dst_entry *make_blackhole(struct net *net, u16 family,
  */
 struct dst_entry *xfrm_lookup(struct net *net, struct dst_entry *dst_orig,
 			      const struct flowi *fl,
-			      struct sock *sk, int flags)
+			      const struct sock *sk, int flags)
 {
 	struct xfrm_policy *pols[XFRM_POLICY_TYPE_MAX];
 	struct flow_cache_object *flo;
@@ -2335,7 +2332,7 @@ EXPORT_SYMBOL(xfrm_lookup);
  */
 struct dst_entry *xfrm_lookup_route(struct net *net, struct dst_entry *dst_orig,
 				    const struct flowi *fl,
-				    struct sock *sk, int flags)
+				    const struct sock *sk, int flags)
 {
 	struct dst_entry *dst = xfrm_lookup(net, dst_orig, fl, sk,
 					    flags | XFRM_LOOKUP_QUEUE |
@@ -2807,7 +2804,6 @@ static struct neighbour *xfrm_neigh_lookup(const struct dst_entry *dst,
 
 int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
 {
-	struct net *net;
 	int err = 0;
 	if (unlikely(afinfo == NULL))
 		return -EINVAL;
@@ -2837,26 +2833,6 @@ int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
 		rcu_assign_pointer(xfrm_policy_afinfo[afinfo->family], afinfo);
 	}
 	spin_unlock(&xfrm_policy_afinfo_lock);
-
-	rtnl_lock();
-	for_each_net(net) {
-		struct dst_ops *xfrm_dst_ops;
-
-		switch (afinfo->family) {
-		case AF_INET:
-			xfrm_dst_ops = &net->xfrm.xfrm4_dst_ops;
-			break;
-#if IS_ENABLED(CONFIG_IPV6)
-		case AF_INET6:
-			xfrm_dst_ops = &net->xfrm.xfrm6_dst_ops;
-			break;
-#endif
-		default:
-			BUG();
-		}
-		*xfrm_dst_ops = *afinfo->dst_ops;
-	}
-	rtnl_unlock();
 
 	return err;
 }
@@ -2892,22 +2868,6 @@ int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
 	return err;
 }
 EXPORT_SYMBOL(xfrm_policy_unregister_afinfo);
-
-static void __net_init xfrm_dst_ops_init(struct net *net)
-{
-	struct xfrm_policy_afinfo *afinfo;
-
-	rcu_read_lock();
-	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET]);
-	if (afinfo)
-		net->xfrm.xfrm4_dst_ops = *afinfo->dst_ops;
-#if IS_ENABLED(CONFIG_IPV6)
-	afinfo = rcu_dereference(xfrm_policy_afinfo[AF_INET6]);
-	if (afinfo)
-		net->xfrm.xfrm6_dst_ops = *afinfo->dst_ops;
-#endif
-	rcu_read_unlock();
-}
 
 static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
@@ -3057,7 +3017,6 @@ static int __net_init xfrm_net_init(struct net *net)
 	rv = xfrm_policy_init(net);
 	if (rv < 0)
 		goto out_policy;
-	xfrm_dst_ops_init(net);
 	rv = xfrm_sysctl_init(net);
 	if (rv < 0)
 		goto out_sysctl;

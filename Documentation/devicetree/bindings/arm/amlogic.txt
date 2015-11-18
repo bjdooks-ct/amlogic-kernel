@@ -14,7 +14,7 @@ Boards with the Amlogic Meson8b SoC shall have the following properties:
     compatible: "amlogic,meson8b";
 
 Board compatible values:
-  - "geniatech,atv1200"
-  - "minix,neo-x8"
-  - "tronfy,mxq"
-  - "hardkernel,odroid-c1"
+  - "geniatech,atv1200" (Meson6)
+  - "minix,neo-x8" (Meson8)
+  - "tronfy,mxq" (Meson8b)
+  - "hardkernel,odroid-c1" (Meson8b)

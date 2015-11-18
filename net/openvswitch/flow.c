@@ -71,7 +71,7 @@ void ovs_flow_stats_update(struct sw_flow *flow, __be16 tcp_flags,
 			   const struct sk_buff *skb)
 {
 	struct flow_stats *stats;
-	int node = numa_node_id();
+	int node = numa_mem_id();
 	int len = skb->len + (skb_vlan_tag_present(skb) ? VLAN_HLEN : 0);
 
 	stats = rcu_dereference(flow->stats[node]);
@@ -698,8 +698,7 @@ int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 {
 	/* Extract metadata from packet. */
 	if (tun_info) {
-		if (ip_tunnel_info_af(tun_info) != AF_INET)
-			return -EINVAL;
+		key->tun_proto = ip_tunnel_info_af(tun_info);
 		memcpy(&key->tun_key, &tun_info->key, sizeof(key->tun_key));
 
 		if (tun_info->options_len) {
@@ -714,6 +713,7 @@ int ovs_flow_key_extract(const struct ip_tunnel_info *tun_info,
 			key->tun_opts_len = 0;
 		}
 	} else  {
+		key->tun_proto = 0;
 		key->tun_opts_len = 0;
 		memset(&key->tun_key, 0, sizeof(key->tun_key));
 	}

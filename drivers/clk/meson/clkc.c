@@ -222,7 +222,7 @@ void __init meson_clk_register_clks(struct device_node *np,
 							   clk_base);
 			break;
 		case CLK_CPU:
-			clk = meson_clk_register_cpu(np ,clk_conf, clk_base,
+			clk = meson_clk_register_cpu(np, clk_conf, clk_base,
 						     &clk_lock);
 			break;
 		case CLK_PLL:

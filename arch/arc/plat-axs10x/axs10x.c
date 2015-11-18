@@ -20,7 +20,6 @@
 #include <asm/clk.h>
 #include <asm/io.h>
 #include <asm/mach_desc.h>
-#include <asm/mcip.h>
 
 #define AXS_MB_CGU		0xE0010000
 #define AXS_MB_CREG		0xE0011000
@@ -455,11 +454,6 @@ static void __init axs103_early_init(void)
 	axs10x_print_board_ver(AXC003_CREG + 4088, "AXC003 CPU Card");
 
 	axs10x_early_init();
-
-#ifdef CONFIG_ARC_MCIP
-	/* No Hardware init, but filling the smp ops callbacks */
-	mcip_init_early_smp();
-#endif
 }
 #endif
 
@@ -487,9 +481,6 @@ static const char *axs103_compat[] __initconst = {
 MACHINE_START(AXS103, "axs103")
 	.dt_compat	= axs103_compat,
 	.init_early	= axs103_early_init,
-#ifdef CONFIG_ARC_MCIP
-	.init_smp	= mcip_init_smp,
-#endif
 MACHINE_END
 
 /*

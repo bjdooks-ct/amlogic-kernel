@@ -120,16 +120,13 @@ static bool is_filtered_packet(struct sock *sk, struct sk_buff *skb)
 	/* Apply filter */
 	flt = &hci_pi(sk)->filter;
 
-	if (bt_cb(skb)->pkt_type == HCI_VENDOR_PKT)
-		flt_type = 0;
-	else
-		flt_type = bt_cb(skb)->pkt_type & HCI_FLT_TYPE_BITS;
+	flt_type = hci_skb_pkt_type(skb) & HCI_FLT_TYPE_BITS;
 
 	if (!test_bit(flt_type, &flt->type_mask))
 		return true;
 
 	/* Extra filter for event packets only */
-	if (bt_cb(skb)->pkt_type != HCI_EVENT_PKT)
+	if (hci_skb_pkt_type(skb) != HCI_EVENT_PKT)
 		return false;
 
 	flt_event = (*(__u8 *)skb->data & HCI_FLT_EVENT_BITS);
@@ -173,14 +170,19 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 			continue;
 
 		if (hci_pi(sk)->channel == HCI_CHANNEL_RAW) {
+			if (hci_skb_pkt_type(skb) != HCI_COMMAND_PKT &&
+			    hci_skb_pkt_type(skb) != HCI_EVENT_PKT &&
+			    hci_skb_pkt_type(skb) != HCI_ACLDATA_PKT &&
+			    hci_skb_pkt_type(skb) != HCI_SCODATA_PKT)
+				continue;
 			if (is_filtered_packet(sk, skb))
 				continue;
 		} else if (hci_pi(sk)->channel == HCI_CHANNEL_USER) {
 			if (!bt_cb(skb)->incoming)
 				continue;
-			if (bt_cb(skb)->pkt_type != HCI_EVENT_PKT &&
-			    bt_cb(skb)->pkt_type != HCI_ACLDATA_PKT &&
-			    bt_cb(skb)->pkt_type != HCI_SCODATA_PKT)
+			if (hci_skb_pkt_type(skb) != HCI_EVENT_PKT &&
+			    hci_skb_pkt_type(skb) != HCI_ACLDATA_PKT &&
+			    hci_skb_pkt_type(skb) != HCI_SCODATA_PKT)
 				continue;
 		} else {
 			/* Don't send frame to other channel types */
@@ -194,7 +196,7 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 				continue;
 
 			/* Put type byte before the data */
-			memcpy(skb_push(skb_copy, 1), &bt_cb(skb)->pkt_type, 1);
+			memcpy(skb_push(skb_copy, 1), &hci_skb_pkt_type(skb), 1);
 		}
 
 		nskb = skb_clone(skb_copy, GFP_ATOMIC);
@@ -260,7 +262,7 @@ void hci_send_to_monitor(struct hci_dev *hdev, struct sk_buff *skb)
 
 	BT_DBG("hdev %p len %d", hdev, skb->len);
 
-	switch (bt_cb(skb)->pkt_type) {
+	switch (hci_skb_pkt_type(skb)) {
 	case HCI_COMMAND_PKT:
 		opcode = cpu_to_le16(HCI_MON_COMMAND_PKT);
 		break;
@@ -278,6 +280,9 @@ void hci_send_to_monitor(struct hci_dev *hdev, struct sk_buff *skb)
 			opcode = cpu_to_le16(HCI_MON_SCO_RX_PKT);
 		else
 			opcode = cpu_to_le16(HCI_MON_SCO_TX_PKT);
+		break;
+	case HCI_DIAG_PKT:
+		opcode = cpu_to_le16(HCI_MON_VENDOR_DIAG);
 		break;
 	default:
 		return;
@@ -303,6 +308,7 @@ static struct sk_buff *create_monitor_event(struct hci_dev *hdev, int event)
 {
 	struct hci_mon_hdr *hdr;
 	struct hci_mon_new_index *ni;
+	struct hci_mon_index_info *ii;
 	struct sk_buff *skb;
 	__le16 opcode;
 
@@ -312,7 +318,7 @@ static struct sk_buff *create_monitor_event(struct hci_dev *hdev, int event)
 		if (!skb)
 			return NULL;
 
-		ni = (void *) skb_put(skb, HCI_MON_NEW_INDEX_SIZE);
+		ni = (void *)skb_put(skb, HCI_MON_NEW_INDEX_SIZE);
 		ni->type = hdev->dev_type;
 		ni->bus = hdev->bus;
 		bacpy(&ni->bdaddr, &hdev->bdaddr);
@@ -327,6 +333,40 @@ static struct sk_buff *create_monitor_event(struct hci_dev *hdev, int event)
 			return NULL;
 
 		opcode = cpu_to_le16(HCI_MON_DEL_INDEX);
+		break;
+
+	case HCI_DEV_SETUP:
+		if (hdev->manufacturer == 0xffff)
+			return NULL;
+
+		/* fall through */
+
+	case HCI_DEV_UP:
+		skb = bt_skb_alloc(HCI_MON_INDEX_INFO_SIZE, GFP_ATOMIC);
+		if (!skb)
+			return NULL;
+
+		ii = (void *)skb_put(skb, HCI_MON_INDEX_INFO_SIZE);
+		bacpy(&ii->bdaddr, &hdev->bdaddr);
+		ii->manufacturer = cpu_to_le16(hdev->manufacturer);
+
+		opcode = cpu_to_le16(HCI_MON_INDEX_INFO);
+		break;
+
+	case HCI_DEV_OPEN:
+		skb = bt_skb_alloc(0, GFP_ATOMIC);
+		if (!skb)
+			return NULL;
+
+		opcode = cpu_to_le16(HCI_MON_OPEN_INDEX);
+		break;
+
+	case HCI_DEV_CLOSE:
+		skb = bt_skb_alloc(0, GFP_ATOMIC);
+		if (!skb)
+			return NULL;
+
+		opcode = cpu_to_le16(HCI_MON_CLOSE_INDEX);
 		break;
 
 	default:
@@ -358,6 +398,28 @@ static void send_monitor_replay(struct sock *sk)
 
 		if (sock_queue_rcv_skb(sk, skb))
 			kfree_skb(skb);
+
+		if (!test_bit(HCI_RUNNING, &hdev->flags))
+			continue;
+
+		skb = create_monitor_event(hdev, HCI_DEV_OPEN);
+		if (!skb)
+			continue;
+
+		if (sock_queue_rcv_skb(sk, skb))
+			kfree_skb(skb);
+
+		if (test_bit(HCI_UP, &hdev->flags))
+			skb = create_monitor_event(hdev, HCI_DEV_UP);
+		else if (hci_dev_test_flag(hdev, HCI_SETUP))
+			skb = create_monitor_event(hdev, HCI_DEV_SETUP);
+		else
+			skb = NULL;
+
+		if (skb) {
+			if (sock_queue_rcv_skb(sk, skb))
+				kfree_skb(skb);
+		}
 	}
 
 	read_unlock(&hci_dev_list_lock);
@@ -385,21 +447,19 @@ static void hci_si_event(struct hci_dev *hdev, int type, int dlen, void *data)
 	bt_cb(skb)->incoming = 1;
 	__net_timestamp(skb);
 
-	bt_cb(skb)->pkt_type = HCI_EVENT_PKT;
+	hci_skb_pkt_type(skb) = HCI_EVENT_PKT;
 	hci_send_to_sock(hdev, skb);
 	kfree_skb(skb);
 }
 
 void hci_sock_dev_event(struct hci_dev *hdev, int event)
 {
-	struct hci_ev_si_device ev;
-
 	BT_DBG("hdev %s event %d", hdev->name, event);
 
-	/* Send event to monitor */
 	if (atomic_read(&monitor_promisc)) {
 		struct sk_buff *skb;
 
+		/* Send event to monitor */
 		skb = create_monitor_event(hdev, event);
 		if (skb) {
 			hci_send_to_channel(HCI_CHANNEL_MONITOR, skb,
@@ -408,10 +468,14 @@ void hci_sock_dev_event(struct hci_dev *hdev, int event)
 		}
 	}
 
-	/* Send event to sockets */
-	ev.event  = event;
-	ev.dev_id = hdev->id;
-	hci_si_event(NULL, HCI_EV_SI_DEVICE, sizeof(ev), &ev);
+	if (event <= HCI_DEV_DOWN) {
+		struct hci_ev_si_device ev;
+
+		/* Send event to sockets */
+		ev.event  = event;
+		ev.dev_id = hdev->id;
+		hci_si_event(NULL, HCI_EV_SI_DEVICE, sizeof(ev), &ev);
+	}
 
 	if (event == HCI_DEV_UNREG) {
 		struct sock *sk;
@@ -503,7 +567,16 @@ static int hci_sock_release(struct socket *sock)
 
 	if (hdev) {
 		if (hci_pi(sk)->channel == HCI_CHANNEL_USER) {
-			hci_dev_close(hdev->id);
+			/* When releasing an user channel exclusive access,
+			 * call hci_dev_do_close directly instead of calling
+			 * hci_dev_close to ensure the exclusive access will
+			 * be released and the controller brought back down.
+			 *
+			 * The checking of HCI_AUTO_OFF is not needed in this
+			 * case since it will have been cleared already when
+			 * opening the user channel.
+			 */
+			hci_dev_do_close(hdev);
 			hci_dev_clear_flag(hdev, HCI_USER_CHANNEL);
 			mgmt_index_added(hdev);
 		}
@@ -928,7 +1001,7 @@ static int hci_sock_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
-	if (flags & (MSG_OOB))
+	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
 
 	if (sk->sk_state == BT_CLOSED)
@@ -1138,7 +1211,7 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 		goto drop;
 	}
 
-	bt_cb(skb)->pkt_type = *((unsigned char *) skb->data);
+	hci_skb_pkt_type(skb) = *((unsigned char *) skb->data);
 	skb_pull(skb, 1);
 
 	if (hci_pi(sk)->channel == HCI_CHANNEL_USER) {
@@ -1147,16 +1220,16 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 		 *
 		 * However check that the packet type is valid.
 		 */
-		if (bt_cb(skb)->pkt_type != HCI_COMMAND_PKT &&
-		    bt_cb(skb)->pkt_type != HCI_ACLDATA_PKT &&
-		    bt_cb(skb)->pkt_type != HCI_SCODATA_PKT) {
+		if (hci_skb_pkt_type(skb) != HCI_COMMAND_PKT &&
+		    hci_skb_pkt_type(skb) != HCI_ACLDATA_PKT &&
+		    hci_skb_pkt_type(skb) != HCI_SCODATA_PKT) {
 			err = -EINVAL;
 			goto drop;
 		}
 
 		skb_queue_tail(&hdev->raw_q, skb);
 		queue_work(hdev->workqueue, &hdev->tx_work);
-	} else if (bt_cb(skb)->pkt_type == HCI_COMMAND_PKT) {
+	} else if (hci_skb_pkt_type(skb) == HCI_COMMAND_PKT) {
 		u16 opcode = get_unaligned_le16(skb->data);
 		u16 ogf = hci_opcode_ogf(opcode);
 		u16 ocf = hci_opcode_ocf(opcode);
@@ -1176,7 +1249,7 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 			/* Stand-alone HCI commands must be flagged as
 			 * single-command requests.
 			 */
-			bt_cb(skb)->req.start = true;
+			bt_cb(skb)->hci.req_flags |= HCI_REQ_START;
 
 			skb_queue_tail(&hdev->cmd_q, skb);
 			queue_work(hdev->workqueue, &hdev->cmd_work);
@@ -1184,6 +1257,12 @@ static int hci_sock_sendmsg(struct socket *sock, struct msghdr *msg,
 	} else {
 		if (!capable(CAP_NET_RAW)) {
 			err = -EPERM;
+			goto drop;
+		}
+
+		if (hci_skb_pkt_type(skb) != HCI_ACLDATA_PKT &&
+		    hci_skb_pkt_type(skb) != HCI_SCODATA_PKT) {
+			err = -EINVAL;
 			goto drop;
 		}
 
