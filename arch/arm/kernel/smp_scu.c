@@ -41,6 +41,9 @@ void scu_enable(void __iomem *scu_base)
 {
 	u32 scu_ctrl;
 
+	pr_info("%s: core_count=%d\n", __func__, scu_get_core_count(scu_base));
+	pr_info("%s: base %08x\n", __func__, scu_a9_get_base());
+		
 #ifdef CONFIG_ARM_ERRATA_764369
 	/* Cortex-A9 only */
 	if ((read_cpuid_id() & 0xff0ffff0) == 0x410fc090) {
@@ -62,6 +65,7 @@ void scu_enable(void __iomem *scu_base)
 	    (read_cpuid_id() & 0x00f0000f) >= 0x00200000)
 		scu_ctrl |= SCU_STANDBY_ENABLE;
 
+	pr_info("%s: setting ctrl %08x\n", __func__, scu_ctrl);
 	writel_relaxed(scu_ctrl, scu_base + SCU_CTRL);
 
 	/*
@@ -69,6 +73,8 @@ void scu_enable(void __iomem *scu_base)
 	 * initialised is visible to the other CPUs.
 	 */
 	flush_cache_all();
+
+	pr_info("%s: SSAC is %08x\n", __func__, readl(scu_base + 0x50));
 }
 #endif
 
@@ -91,6 +97,7 @@ int scu_power_mode(void __iomem *scu_base, unsigned int mode)
 	val = readb_relaxed(scu_base + SCU_CPU_STATUS + cpu) & ~0x03;
 	val |= mode;
 	writeb_relaxed(val, scu_base + SCU_CPU_STATUS + cpu);
-
+	printk(KERN_INFO "%s: cpu %d, new mode %08x\n", __func__, cpu, val);
+	
 	return 0;
 }
