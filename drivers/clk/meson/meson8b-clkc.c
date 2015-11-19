@@ -178,6 +178,7 @@ static void __init meson8b_clkc_init(struct device_node *np)
 		pr_err("%s: Unable to map xtal base\n", __func__);
 		return;
 	}
+	pr_info("%s: base %p\n", __func__, clk_base);
 
 	meson_clk_register_clks(np, &meson8b_xtal_conf, 1, clk_base);
 	iounmap(clk_base);
