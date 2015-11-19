@@ -1681,7 +1681,7 @@ asmlinkage int vprintk_emit(int facility, int level,
 	local_irq_save(flags);
 	this_cpu = smp_processor_id();
 
-	if (1) {
+	if (0) {
 		extern void printascii(const char *msg);
 		char msgbuff[512];
 
