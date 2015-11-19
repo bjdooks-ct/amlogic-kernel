@@ -60,6 +60,7 @@
 #include <asm/unwind.h>
 #include <asm/memblock.h>
 #include <asm/virt.h>
+#include <asm/cp15.h>
 
 #include "atags.h"
 
@@ -631,9 +632,9 @@ static void __init setup_processor(void)
 	cpu_cache = *list->cache;
 #endif
 
-	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx\n",
+	pr_info("CPU: %s [%08x] revision %d (ARMv%s), cr=%08lx, aux=%08lx\n",
 		cpu_name, read_cpuid_id(), read_cpuid_id() & 15,
-		proc_arch[cpu_architecture()], get_cr());
+		proc_arch[cpu_architecture()], get_cr(), get_auxcr());
 
 	snprintf(init_utsname()->machine, __NEW_UTS_LEN + 1, "%s%c",
 		 list->arch_name, ENDIANNESS);
