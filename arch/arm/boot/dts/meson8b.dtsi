@@ -127,6 +127,12 @@
 			arm,data-latency = <3 3 3>;
 			arm,tag-latency = <2 2 2>;
 			arm,filter-ranges = <0x100000 0xc0000000>;
+			/* arm,double-linefill = <1> ; */
+			arm,shared-override = <1>;
+			/* arm,prefetch-drop = <1>; */
+			/* arm,prefetch-offset = <7>; */
+			/* prefetch-instr = <1>; */
+			/* prefetch-data = <1>; */
 			cache-unified;
 			cache-level = <2>;
 		};
