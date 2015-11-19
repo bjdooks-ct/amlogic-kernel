@@ -378,6 +378,7 @@ ENTRY(secondary_startup)
 	 */
 
  ARM_BE8(setend	be)				@ ensure we are in BE8 mode
+	bl	v7_invalidate_l1
 
 #ifdef CONFIG_ARM_VIRT_EXT
 	bl	__hyp_stub_install_secondary
