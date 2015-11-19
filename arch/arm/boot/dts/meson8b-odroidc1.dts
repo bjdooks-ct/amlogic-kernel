@@ -77,8 +77,8 @@
 	pinctrl-0 = <&mmc0_sd_b_pins>;
 	pinctrl-names = "default";
 	meson,sdio-port = <1>;
-	cd-gpios = <&gpio CARD_6 0>;
-	cd-inverted;
+	//cd-gpios = <&gpio CARD_6 0>;
+	//cd-inverted;
 };
 
 &uart_AO {
@@ -88,7 +88,7 @@
 };
 
 &ethmac {
-	status = "okay";
+	//status = "okay";
 	pinctrl-0 = <&eth_pins>;
 	pinctrl-names = "default";
 
