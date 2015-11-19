@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2015 Carlo Caione <carlo@endlessm.com>
  *
@@ -39,12 +40,19 @@
 
 static void __iomem *sram_base;
 static void __iomem *scu_base;
+static void __iomem *tmp_base;
 static struct regmap *pmu;
 
 static void __init meson8b_smp_prepare_cpus(unsigned int max_cpus)
 {
 	static struct device_node *node;
 
+	tmp_base = ioremap(0xC81000E0, 0x1f);	/* temporary debug map */
+	if (!tmp_base) {
+		pr_err("failed to remap dbg\n");
+		return;
+	}
+	
 	/* SMP SRAM */
 	node = of_find_compatible_node(NULL, NULL, "amlogic,meson8b-smp-sram");
 	if (!node) {
@@ -140,12 +148,16 @@ static int meson8b_set_cpu_power_ctrl(unsigned int cpu, bool is_power_on)
 
 		/* Isolation disable */
 		ret = regmap_update_bits(pmu, MESON_CPU_AO_RTI_PWR_A9_CNTL0,
-					 BIT(cpu), 0);
+					 BIT(cpu) | (0x10 << cpu) | (0x100 << cpu), 0);
 		if (ret < 0) {
 			pr_err("Error when disabling isolation\n");
 			return ret;
 		}
 
+		pr_info("cpu %d: iso=%08x, power=%08x, pdc=%08x,%08x\n",
+			cpu, readl(tmp_base + 0x00), readl(tmp_base + 0x04),
+			readl(tmp_base + 0x14), readl(tmp_base + 0x18));
+		
 		/* Reset disable */
 		reset_control_deassert(rstc);
 
@@ -189,6 +201,8 @@ static int meson8b_set_cpu_power_ctrl(unsigned int cpu, bool is_power_on)
 	return 0;
 }
 
+#include <asm/cacheflush.h>
+
 static int meson8b_smp_boot_secondary(unsigned int cpu, struct task_struct *idle)
 {
 	unsigned long timeout;
@@ -206,7 +220,9 @@ static int meson8b_smp_boot_secondary(unsigned int cpu, struct task_struct *idle
 
 	udelay(100);
 	writel(virt_to_phys(secondary_startup), sram_base + MESON_CPU_CTRL_ADDR_REG(cpu));
+	flush_cache_all();
 
+	//writel(0xf << (cpu * 4), scu_base + 0x0c);
 	reg = readl(sram_base + MESON_CPU_CTRL_REG);
 	reg |= (BIT(cpu) | BIT(0));
 	writel(reg, sram_base + MESON_CPU_CTRL_REG);
@@ -216,7 +232,11 @@ static int meson8b_smp_boot_secondary(unsigned int cpu, struct task_struct *idle
 
 static void meson8b_smp_secondary_init(unsigned int cpu)
 {
+	//flush_cache_all();
 	scu_power_mode(scu_base, SCU_PM_NORMAL);
+	//writel(0xf << (cpu * 4), scu_base + 0x0c);
+	pr_info("%s: scu power_status %08x\n", __func__, readl(scu_base + 0x8));
+	pr_info("%s: scu config %08x\n", __func__, readl(scu_base + 0x4));
 }
 
 static struct smp_operations meson8b_smp_ops __initdata = {
