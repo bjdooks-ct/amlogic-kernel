@@ -47,6 +47,7 @@
 #include <asm/virt.h>
 #include <asm/mach/arch.h>
 #include <asm/mpu.h>
+#include <asm/cp15.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ipi.h>
@@ -373,7 +374,7 @@ asmlinkage void secondary_start_kernel(void)
 
 	cpu_init();
 
-	pr_debug("CPU%u: Booted secondary processor\n", cpu);
+	pr_info("CPU%u: Booted secondary processor\n", cpu);
 
 	preempt_disable();
 	trace_hardirqs_off();
@@ -389,6 +390,10 @@ asmlinkage void secondary_start_kernel(void)
 	calibrate_delay();
 
 	smp_store_cpu_info(cpu);
+	
+	pr_info("CPU: [%08x] revision %d, cr=%08lx, aux=%08x\n",
+		read_cpuid_id(), read_cpuid_id() & 15,
+		get_cr(), get_auxcr());
 
 	/*
 	 * OK, now it's safe to let the boot CPU continue.  Wait for
