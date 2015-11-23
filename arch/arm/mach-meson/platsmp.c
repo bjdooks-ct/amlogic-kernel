@@ -104,6 +104,11 @@ static int meson8b_set_cpu_power_ctrl(unsigned int cpu, bool is_power_on)
 	int ret;
 	u32 val;
 
+	if (IS_ERR(rstc)) {
+		pr_err("failed to find rstc\n");
+		return PTR_ERR(rstc);
+	}
+
 	if (is_power_on) {
 
 		/* CPU power UP */
