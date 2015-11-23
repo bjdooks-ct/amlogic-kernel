@@ -203,6 +203,7 @@ static int meson_reset_cpu_assert(struct reset_controller_dev *rcdev,
 	reg = readl(reset_cpu->reset_base);
 	reg |= BIT(id + 24);
 	writel(reg, reset_cpu->reset_base);
+	pr_info("%s: new reset %08x\n", __func__, readl(reset_cpu->reset_base));
 
 	return 0;
 }
@@ -218,6 +219,7 @@ static int meson_reset_cpu_deassert(struct reset_controller_dev *rcdev,
 	reg = readl(reset_cpu->reset_base);
 	reg &= ~BIT(id + 24);
 	writel(reg, reset_cpu->reset_base);
+	pr_info("%s: new reset %08x\n", __func__, readl(reset_cpu->reset_base));
 
 	return 0;
 }
