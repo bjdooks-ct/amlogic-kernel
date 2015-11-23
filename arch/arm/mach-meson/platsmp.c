@@ -86,6 +86,7 @@ static void __init meson8b_smp_prepare_cpus(unsigned int max_cpus)
 		return;
 	}
 
+	writel(~0, scu_base + 0x54);	/* all registers non-secure */
 	scu_enable(scu_base);
 }
 
