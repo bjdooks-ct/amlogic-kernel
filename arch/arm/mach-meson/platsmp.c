@@ -243,7 +243,8 @@ static void meson8b_smp_secondary_init(unsigned int cpu)
 	scu_power_mode(scu_base, SCU_PM_NORMAL);
 	//writel(0xf << (cpu * 4), scu_base + 0x0c);
 	pr_info("%s: scu power_status %08x\n", __func__, readl(scu_base + 0x8));
-	pr_info("%s: scu config %08x\n", __func__, readl(scu_base + 0x4));
+	pr_info("%s: scu config %08x, ssac=%08x\n", __func__,
+		readl(scu_base + 0x4), readl(scu_base + 0x54));
 }
 
 static struct smp_operations meson8b_smp_ops __initdata = {
