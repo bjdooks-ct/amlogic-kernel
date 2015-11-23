@@ -140,6 +140,8 @@ static int meson8b_set_cpu_power_ctrl(unsigned int cpu, bool is_power_on)
 			return ret;
 		}
 
+		/* issue reset to tag rams */
+		writel(0xf << (cpu * 4), scu_base + 0x0c);
 		udelay(10);
 
 		val = 0;
@@ -164,6 +166,7 @@ static int meson8b_set_cpu_power_ctrl(unsigned int cpu, bool is_power_on)
 			readl(tmp_base + 0x14), readl(tmp_base + 0x18));
 		
 		/* Reset disable */
+		writel(0x0 << (cpu * 4), scu_base + 0x0c);
 		reset_control_deassert(rstc);
 
 	} else {
@@ -227,7 +230,6 @@ static int meson8b_smp_boot_secondary(unsigned int cpu, struct task_struct *idle
 	writel(virt_to_phys(secondary_startup), sram_base + MESON_CPU_CTRL_ADDR_REG(cpu));
 	flush_cache_all();
 
-	//writel(0xf << (cpu * 4), scu_base + 0x0c);
 	reg = readl(sram_base + MESON_CPU_CTRL_REG);
 	reg |= (BIT(cpu) | BIT(0));
 	writel(reg, sram_base + MESON_CPU_CTRL_REG);
