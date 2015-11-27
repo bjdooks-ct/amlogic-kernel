@@ -40,6 +40,8 @@ static struct regmap_config syscon_regmap_config = {
 	.reg_bits = 32,
 	.val_bits = 32,
 	.reg_stride = 4,
+	.fast_io = 1,
+	.cache_type = REGCACHE_NONE,
 };
 
 static struct syscon *of_syscon_register(struct device_node *np)
