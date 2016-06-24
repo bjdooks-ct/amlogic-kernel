@@ -14,6 +14,8 @@
  *
  */
 
+#define SUPPORT_SYSRQ
+
 #include <linux/clk.h>
 #include <linux/console.h>
 #include <linux/delay.h>
@@ -83,6 +85,8 @@
 #define AML_UART_PORT_NUM		6
 #define AML_UART_DEV_NAME		"ttyAML"
 
+/* fake flag for handling breaks */
+#define AML_RX_BREAK			(1 << 31)
 
 static struct uart_driver meson_uart_driver;
 
@@ -183,12 +187,12 @@ static void meson_receive_chars(struct uart_port *port)
 {
 	struct tty_port *tport = &port->state->port;
 	char flag;
-	u32 status, ch, mode;
+	u32 ostatus, status, ch, mode;
 
 	do {
 		flag = TTY_NORMAL;
 		port->icount.rx++;
-		status = readl(port->membase + AML_UART_STATUS);
+		ostatus = status = readl(port->membase + AML_UART_STATUS);
 
 		if (status & AML_UART_ERR) {
 			if (status & AML_UART_TX_FIFO_WERR)
@@ -215,6 +219,14 @@ static void meson_receive_chars(struct uart_port *port)
 
 		ch = readl(port->membase + AML_UART_RFIFO);
 		ch &= 0xff;
+
+		if (ostatus & AML_UART_FRAME_ERR && ch == 0) {
+			uart_handle_break(port);
+			continue;
+		};
+
+		if (uart_handle_sysrq_char(port, ch))
+			continue;
 
 		if ((status & port->ignore_status_mask) == 0)
 			tty_insert_flip_char(tport, ch, flag);
@@ -284,7 +296,7 @@ static int meson_uart_startup(struct uart_port *port)
 
 	val = (AML_UART_RECV_IRQ(1) | AML_UART_XMIT_IRQ(port->fifosize / 2));
 	writel(val, port->membase + AML_UART_MISC);
-
+	
 	ret = request_irq(port->irq, meson_uart_interrupt, 0,
 			  meson_uart_type(port), port);
 
