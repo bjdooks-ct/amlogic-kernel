@@ -178,6 +178,14 @@
 				gpio-controller;
 				#gpio-cells = <2>;
 			};
+
+			mmc0_sd_b_pins: mmc0_sd_b {
+				mux {
+					groups = "sd_d1_b", "sd_d0_b", "sd_clk_b", "sd_cmd_b",
+						 "sd_d3_b", "sd_d2_b";
+					function = "sd_b";
+				};
+			};
 		};
 
 		pinctrl_aobus: pinctrl@c8100084 {
@@ -200,14 +208,6 @@
 				mux {
 					groups = "uart_tx_ao_a", "uart_rx_ao_a";
 					function = "uart_ao";
-				};
-			};
-
-			mmc0_sd_b_pins: mmc0_sd_b {
-				mux {
-					groups = "sd_d1_b", "sd_d0_b", "sd_clk_b", "sd_cmd_b",
-						 "sd_d3_b", "sd_d2_b";
-					function = "sd_b";
 				};
 			};
 		};
