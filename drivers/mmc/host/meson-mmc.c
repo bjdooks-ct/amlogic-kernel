@@ -350,7 +350,7 @@ static irqreturn_t meson_mmc_irq(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-void meson_mmc_read_response(struct meson_mmc_host *host)
+static void meson_mmc_read_response(struct meson_mmc_host *host)
 {
 	struct mmc_command *cmd = host->mrq->cmd;
 	u32 mult;
@@ -373,12 +373,12 @@ void meson_mmc_read_response(struct meson_mmc_host *host)
 	}
 }
 
-struct mmc_command meson_mmc_cmd = {
+static struct mmc_command meson_mmc_cmd = {
 	.opcode	= MMC_STOP_TRANSMISSION,
 	.flags	= MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC,
 };
 
-struct mmc_request meson_mmc_stop = {
+static struct mmc_request meson_mmc_stop = {
 	.cmd = &meson_mmc_cmd,
 };
 
