@@ -44,6 +44,7 @@
  *     OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/clock/meson8b-clkc.h>
 #include <dt-bindings/gpio/meson8b-gpio.h>
 #include <dt-bindings/reset/amlogic,meson8b-reset.h>
@@ -160,13 +161,60 @@
 			compatible = "amlogic,meson8b-rtc";
 			reg = <0xc8100740 0x14>;
 			resets = <&reset RESET_RTC>;
-			status = "disabled";
+ 			status = "disabled";
 		};
 
 		clkc: clock-controller@c1104000 {
 			#clock-cells = <1>;
 			compatible = "amlogic,meson8b-clkc";
 			reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+		};
+
+		// usb phys at CBUS_REG_ADDR(0x2200) and 0x2208
+		usbphys: usb-phy0@c1108800 {
+			compatible = "amlogic,meson-usb-phy";
+			reg = <0xc1108800 0x40>;
+			clocks = <&clkc CLKID_CLK81>;
+			resets = <&reset RESET_USB_OTG>;
+
+			reset1-gpios = <&gpio_ao 4 GPIO_ACTIVE_LOW>;
+
+			#size-cells=<1>;
+			#address-cells=<0>;
+		       
+			usbphy0: usb-phy@0 {
+				#phy-cells = <0>;
+				reg = <0>;
+			};
+
+			usbphy1: usb-phy@1 {
+				#phy-cells = <0>;
+				reg = <1>;
+			};
+		};
+
+		usb0: usb-controller@0xc9040000 {
+			compatible = "amlogic,meson8b-usbotg", "snps,dwc2";
+			clocks = <&clkc CLKID_CLK81>;
+			clock-names = "otg";
+			reg = <0xc9040000 0x80000>;
+			interrupts = <0 30 1>;
+			phys = <&usbphy0>;
+			phy-names = "usb2-phy";
+			dr_mode = "otg";
+			//status = "disabled";
+		};
+
+		usb1: usb-controller@0xc90C0000 {
+			compatible = "amlogic,meson8b-usb", "snps,dwc2";
+			reg = <0xc90c0000 0x80000>;
+			interrupts = <0 31 1>;
+			clocks = <&clkc CLKID_CLK81>;
+			clock-names = "otg";
+			phys = <&usbphy1>;
+			phy-names = "usb2-phy";
+			dr_mode = "host";
+			//status = "disabled";
 		};
 
 		pinctrl_cbus: pinctrl@c1109880 {
