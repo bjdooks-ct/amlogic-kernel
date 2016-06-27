@@ -54,6 +54,77 @@
 
 static const char dwc2_driver_name[] = "dwc2";
 
+static const struct dwc2_core_params params_amlogic_host = {
+	.otg_cap			= 2,	/* No HNP/SRP capable */
+	.otg_ver			= 0,	/* 1.3 */
+	.dma_enable			= 1,
+	.dma_desc_enable		= 0,
+	.dma_desc_fs_enable		= 0,
+	.speed				= 0,	/* High Speed */
+	.enable_dynamic_fifo		= 1,
+	.en_multiple_tx_fifo		= 1,
+	//.host_rx_fifo_size		= 512*4,
+	//.host_nperio_tx_fifo_size	= 512*4 - 4,
+	//.host_perio_tx_fifo_size	= 512*4 - 4,
+	//.max_transfer_size		= 65535,
+	//.max_packet_count		= 511*4,
+	.host_rx_fifo_size		= 0x200,
+	.host_nperio_tx_fifo_size	= 0x1F4,
+	.host_perio_tx_fifo_size	= 0x1F4,
+	//.host_rx_fifo_size		= -1,
+	//.host_nperio_tx_fifo_size	= -1,
+	//.host_perio_tx_fifo_size	= -1,
+	.max_transfer_size		= -1,
+	.max_packet_count		= -1,
+	.host_channels			= -1,
+	.phy_type			= -1,
+	.phy_utmi_width			= -1,
+	.phy_ulpi_ddr			= -1,
+	.phy_ulpi_ext_vbus		= -1,
+	.i2c_enable			= -1,
+	.ulpi_fs_ls			= -1,
+	.host_support_fs_ls_low_power	= -1,
+	.host_ls_low_power_phy_clk	= -1,
+	.ts_dline			= -1,
+	.reload_ctl			= -1,	
+	.ahbcfg				= GAHBCFG_AHB_SINGLE | (GAHBCFG_HBSTLEN_INCR4 << GAHBCFG_HBSTLEN_SHIFT),
+	.uframe_sched			= 0,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
+};
+
+static const struct dwc2_core_params params_amlogic_otg = {
+	.otg_cap			= 0,	/* ? correct */
+	.otg_ver			= 0,	/* 1.3 */
+	.dma_enable			= 1,
+	.dma_desc_enable		= 0,
+	.dma_desc_fs_enable		= 0,
+	.speed				= 0,	/* High Speed */
+	.enable_dynamic_fifo		= 1,
+	.en_multiple_tx_fifo		= 1,
+	.host_rx_fifo_size		= 512,
+	.host_nperio_tx_fifo_size	= 510,
+	.host_perio_tx_fifo_size	= 510,
+	.max_transfer_size		= 65535,
+	.max_packet_count		= 511,
+	.host_channels			= -1,
+	.phy_type			= -1,
+	.phy_utmi_width			= -1,
+	.phy_ulpi_ddr			= -1,
+	.phy_ulpi_ext_vbus		= -1,
+	.i2c_enable			= -1,
+	.ulpi_fs_ls			= -1,
+	.host_support_fs_ls_low_power	= -1,
+	.host_ls_low_power_phy_clk	= -1,
+	.ts_dline			= -1,
+	.reload_ctl			= -1,	
+	.ahbcfg				= GAHBCFG_HBSTLEN_INCR4 <<
+					  GAHBCFG_HBSTLEN_SHIFT,
+	.uframe_sched			= 0,
+	.external_id_pin_ctl		= -1,
+	.hibernation			= -1,
+};
+
 static const struct dwc2_core_params params_hi6220 = {
 	.otg_cap			= 2,	/* No HNP/SRP capable */
 	.otg_ver			= 0,	/* 1.3 */
@@ -457,6 +528,8 @@ static void dwc2_driver_shutdown(struct platform_device *dev)
 }
 
 static const struct of_device_id dwc2_of_match_table[] = {
+	{ .compatible = "amlogic,meson8b-usb", .data = &params_amlogic_host },
+	{ .compatible = "amlogic,meson8b-usbotg", .data = &params_amlogic_otg },
 	{ .compatible = "brcm,bcm2835-usb", .data = &params_bcm2835 },
 	{ .compatible = "hisilicon,hi6220-usb", .data = &params_hi6220 },
 	{ .compatible = "rockchip,rk3066-usb", .data = &params_rk3066 },
