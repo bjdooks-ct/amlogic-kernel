@@ -116,6 +116,7 @@ static int amlogic_usb_init(struct phy *_phy)
 	reg = readl(phy->regs + PHYREG_CONFIG);
 	reg |= CONFIG_CLK_32KALT;
 	reg &= ~CONFIG_POWEROFF;
+	// may need to set CLK_DIV(1) and CLK_SEL(0) //
 	writel(reg, phy->regs + PHYREG_CONFIG);
 	dev_info(phys->dev, "phy%d: config=%08x\n", phy->id, reg);
 
