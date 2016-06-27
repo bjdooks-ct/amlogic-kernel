@@ -584,6 +584,7 @@ static int meson_mmc_probe(struct platform_device *pdev)
 error_free_host:
 	mmc_free_host(mmc);
 
+	dev_err(&pdev->dev, "failed to bind (%d)\n", ret);
 	return ret;
 }
 
