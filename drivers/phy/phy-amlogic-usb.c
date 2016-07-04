@@ -59,25 +59,6 @@ struct amlogic_usbphys {
 	struct amlogic_usbphy	phys[];
 };
 
-static int amlogic_usb_phy_power(struct amlogic_usbphy *phy, bool to)
-{
-	return 0;
-}
-
-static int amlogic_usb_power_off(struct phy *_phy)
-{
-	struct amlogic_usbphy *phy = phy_get_drvdata(_phy);
-	dev_info(phy->parent->dev, "phy%d: power-off\n", phy->id);
-	return amlogic_usb_phy_power(phy, false);
-}
-
-static int amlogic_usb_power_on(struct phy *_phy)
-{
-	struct amlogic_usbphy *phy = phy_get_drvdata(_phy);
-	dev_info(phy->parent->dev, "phy%d: power-on\n", phy->id);	
-	return amlogic_usb_phy_power(phy, true);
-}
-
 // notes
 // USB0 clock is CBUS1 0x1051  bit 21
 // USB1 clock is CBUS1 0x1051  bit 22
@@ -104,13 +85,21 @@ static void hack_enable_clocks(void)
 		__func__, readl(reg + 0x0), readl(reg + 0x4));	
 }
 
-static int amlogic_usb_init(struct phy *_phy)
+static int amlogic_usb_power_off(struct phy *_phy)
+{
+	struct amlogic_usbphy *phy = phy_get_drvdata(_phy);
+	dev_info(phy->parent->dev, "phy%d: power-off\n", phy->id);
+
+	return 0;
+}
+
+static int amlogic_usb_power_on(struct phy *_phy)
 {
 	struct amlogic_usbphy *phy = phy_get_drvdata(_phy);
 	struct amlogic_usbphys *phys = phy->parent;
 	u32 reg;
 
-	dev_info(phys->dev, "phy%d: initialising phy\n", phy->id);
+	dev_info(phy->parent->dev, "phy%d: power-on\n", phy->id);
 	hack_enable_clocks();
 
 	reg = readl(phy->regs + PHYREG_CONFIG);
@@ -141,6 +130,16 @@ static int amlogic_usb_init(struct phy *_phy)
 	if (!(readl(phy->regs + PHYREG_CTRL) & CTRL_CLK_DETECTED))
 		dev_warn(phys->dev, "phy%d: no clock detected\n", phy->id);
 
+	msleep(10);
+	return 0;
+}
+
+static int amlogic_usb_init(struct phy *_phy)
+{
+	struct amlogic_usbphy *phy = phy_get_drvdata(_phy);
+	struct amlogic_usbphys *phys = phy->parent;
+
+	dev_info(phys->dev, "phy%d: initialising phy (already)\n", phy->id);
 	return 0;
 }
 
