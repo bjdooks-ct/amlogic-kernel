@@ -40,14 +40,21 @@
 #define CTRL_FSEL(__fs)		((__fs) << 22)
 #define CTRL_FSEL_MASK		(7 << 22)
 
+#define ADAP_BC_OTGDIS		BIT(2)
+#define ADAP_BC_IDDIG		BIT(12)
+#define ADAP_BC_ACA_ENABLE	BIT(16)
+
 struct amlogic_usbphys;
 struct amlogic_usbphy {
 	struct amlogic_usbphys	*parent;
 	struct device_node	*node;
 	struct phy		*phy;
+	struct usb_otg		*otg;
 	struct gpio_desc	*reset;
 	void __iomem		*regs;
+	struct delayed_work	id_work;
 	unsigned int		id;
+	u32			last_otg;
 };	
 
 struct amlogic_usbphys {
@@ -123,8 +130,13 @@ static int amlogic_usb_power_on(struct phy *_phy)
 
 	if (phy->id == 1) {
 		reg = readl(phy->regs + PHYREG_ADP_BC);
-		reg |= BIT(16);  // ADA_EANBLE;
+		reg |= ADAP_BC_ACA_ENABLE;
 		writel(reg, phy->regs + PHYREG_ADP_BC);
+	}
+
+	if (phy->id == 0) {
+		phy->last_otg = (u32)~0;
+		schedule_delayed_work(&phy->id_work, msecs_to_jiffies(100));
 	}
 
 	if (!(readl(phy->regs + PHYREG_CTRL) & CTRL_CLK_DETECTED))
@@ -132,6 +144,25 @@ static int amlogic_usb_power_on(struct phy *_phy)
 
 	msleep(10);
 	return 0;
+}
+
+static void amlogic_id_work(struct work_struct *work)
+{
+	struct amlogic_usbphy *phy;
+	u32 reg;
+
+	phy =  container_of(work, struct amlogic_usbphy, id_work.work);
+	reg = readl(phy->regs + PHYREG_ADP_BC);
+	reg &= ADAP_BC_IDDIG;
+
+	/* set means slave, clear is host */
+	if (reg != phy->last_otg) {
+		dev_info(phy->parent->dev, "phy %d: otg now %s\n",
+			 phy->id, reg ? "slave" : "host");
+		phy->last_otg = reg;
+	}
+	
+	schedule_delayed_work(&phy->id_work, msecs_to_jiffies(100));
 }
 
 static int amlogic_usb_init(struct phy *_phy)
@@ -240,6 +271,18 @@ static int amlogic_usb_probe(struct platform_device *pdev)
 		if (ch == 1) {
 			phy->reset = devm_gpiod_get_optional(dev, "reset1",
 							     GPIOD_OUT_LOW);
+		}
+
+		if (ch == 0) {
+			struct usb_otg *otg;
+
+			otg = devm_kzalloc(dev, sizeof(struct usb_otg), GFP_KERNEL);
+			if (otg)
+				return -ENOMEM;
+
+			otg->phy = phy->phy;
+			phy->otg = otg;
+			INIT_DELAYED_WORK(&phy->id_work, amlogic_id_work);
 		}
 
 		phy->id = ch;
