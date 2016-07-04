@@ -202,7 +202,7 @@
 			phys = <&usbphy0>;
 			phy-names = "usb2-phy";
 			dr_mode = "otg";
-			//status = "disabled";
+			status = "disabled";
 		};
 
 		usb1: usb-controller@0xc90C0000 {
