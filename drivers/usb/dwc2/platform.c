@@ -56,7 +56,7 @@ static const char dwc2_driver_name[] = "dwc2";
 
 static const struct dwc2_core_params params_amlogic_host = {
 	.otg_cap			= 2,	/* No HNP/SRP capable */
-	.otg_ver			= 0,	/* 1.3 */
+	.otg_ver			= 1,	/* 1.3 */
 	.dma_enable			= 1,
 	.dma_desc_enable		= 0,
 	.dma_desc_fs_enable		= 0,
@@ -95,7 +95,7 @@ static const struct dwc2_core_params params_amlogic_host = {
 
 static const struct dwc2_core_params params_amlogic_otg = {
 	.otg_cap			= 0,	/* ? correct */
-	.otg_ver			= 0,	/* 1.3 */
+	.otg_ver			= 1,	/* 1.3 */
 	.dma_enable			= 1,
 	.dma_desc_enable		= 0,
 	.dma_desc_fs_enable		= 0,
